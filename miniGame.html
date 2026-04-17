@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Maze Snake (Pac-Man Style)</title>
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #000;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    flex-direction: column;
+  }
+  #menu { text-align: center; }
+  #gameCanvas {
+    display: none;
+    background: black;
+    border: 3px solid #222;
+  }
+  button {
+    padding: 10px 20px;
+    font-size: 16px;
+    margin-top: 10px;
+    cursor: pointer;
+  }
+  input[type="color"] {
+    width: 60px;
+    height: 40px;
+    border: none;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="menu">
+  <h1>Maze Snake</h1>
+  <p>Pick your snake color:</p>
+  <input type="color" id="colorPicker" value="#00ff00" />
+  <br />
+  <button onclick="startGame()">Start Game</button>
+</div>
+
+<canvas id="gameCanvas" width="560" height="620"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const TILE = 20;
+
+let snake, dir, color, pellets, score, ghost;
+let gameLoopId, ghostLoopId;
+
+const maze = [
+  "1111111111111111111111111111",
+  "1000000000001110000000000001",
+  "1011110111101110111101111101",
+  "1000000000000000000000000001",
+  "1011110110111111101101111101",
+  "1000000110001110001100000001",
+  "1111110111101110111101111111",
+  "0000010000000000000001000000",
+  "1111110110111111101101111111",
+  "1000000000001110000000000001",
+  "1011110111101110111101111101",
+  "1000000000000000000000000001",
+  "1111111111111111111111111111",
+];
+
+function startGame() {
+  color = document.getElementById("colorPicker").value;
+  document.getElementById("menu").style.display = "none";
+  canvas.style.display = "block";
+
+  snake = [{ x: 1, y: 1 }];
+  dir = { x: 1, y: 0 };
+  score = 0;
+
+  pellets = [];
+  for (let y = 0; y < maze.length; y++) {
+    for (let x = 0; x < maze[y].length; x++) {
+      if (maze[y][x] === "0") {
+        pellets.push({ x, y });
+      }
+    }
+  }
+
+  ghost = { x: 26, y: 11 };
+
+  document.addEventListener("keydown", changeDir);
+
+  gameLoopId = setInterval(loop, 120);
+  ghostLoopId = setInterval(moveGhost, 140);
+}
+
+function changeDir(e) {
+  const k = e.key;
+  if (k === "ArrowUp") dir = { x: 0, y: -1 };
+  if (k === "ArrowDown") dir = { x: 0, y: 1 };
+  if (k === "ArrowLeft") dir = { x: -1, y: 0 };
+  if (k === "ArrowRight") dir = { x: 1, y: 0 };
+}
+
+function loop() {
+  update();
+  draw();
+}
+
+function update() {
+  const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+  if (maze[head.y]?.[head.x] === "1") return;
+
+  snake.unshift(head);
+
+  pellets = pellets.filter(p => {
+    if (p.x === head.x && p.y === head.y) {
+      score++;
+      return false;
+    }
+    return true;
+  });
+
+  snake.pop();
+
+  if (ghost.x === head.x && ghost.y === head.y) {
+    endGame();
+  }
+
+  if (pellets.length === 0) {
+    endGame(true);
+  }
+}
+
+function moveGhost() {
+  const head = snake[0];
+
+  const moves = [
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: -1 }
+  ];
+
+  moves.sort((a, b) => {
+    const da = Math.hypot((ghost.x + a.x) - head.x, (ghost.y + a.y) - head.y);
+    const db = Math.hypot((ghost.x + b.x) - head.x, (ghost.y + b.y) - head.y);
+    return da - db;
+  });
+
+  for (let m of moves) {
+    const nx = ghost.x + m.x;
+    const ny = ghost.y + m.y;
+    if (maze[ny]?.[nx] !== "1") {
+      ghost.x = nx;
+      ghost.y = ny;
+      break;
+    }
+  }
+
+  for (let s of snake) {
+    if (ghost.x === s.x && ghost.y === s.y) {
+      endGame();
+    }
+  }
+}
+
+function endGame(win = false) {
+  clearInterval(gameLoopId);
+  clearInterval(ghostLoopId);
+  alert((win ? "You Win! " : "Game Over! ") + "Score: " + score);
+  location.reload();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let y = 0; y < maze.length; y++) {
+    for (let x = 0; x < maze[y].length; x++) {
+      if (maze[y][x] === "1") {
+        ctx.fillStyle = "blue";
+        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+      }
+    }
+  }
+
+  ctx.fillStyle = "white";
+  pellets.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x * TILE + TILE/2, p.y * TILE + TILE/2, 3, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = color;
+  snake.forEach(s => {
+    ctx.fillRect(s.x * TILE, s.y * TILE, TILE, TILE);
+  });
+
+  ctx.fillStyle = "red";
+  ctx.fillRect(ghost.x * TILE, ghost.y * TILE, TILE, TILE);
+
+  ctx.fillStyle = "white";
+  ctx.fillText("Score: " + score, 10, canvas.height - 10);
+}
+</script>
+
+</body>
+</html>
